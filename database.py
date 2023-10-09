@@ -1,6 +1,6 @@
 import sqlite3 as sq
 from create_bot import bot
-
+import datetime
 
 def sql_start():
     global base, cur
@@ -8,89 +8,55 @@ def sql_start():
     cur = base.cursor()
     if base:
         print("Data base connected OK!")
-    base.execute('CREATE TABLE IF NOT EXISTS cosmetic(counter INTEGER PRIMARY KEY AUTOINCREMENT, photo TEXT, name TEXT, description TEXT, price TEXT, article TEXT)')
-    base.execute('CREATE TABLE IF NOT EXISTS sweets(counter INTEGER PRIMARY KEY AUTOINCREMENT, photo TEXT, name TEXT, description TEXT, price TEXT, article TEXT)')
-    base.execute('CREATE TABLE IF NOT EXISTS box(counter INTEGER PRIMARY KEY AUTOINCREMENT, photo TEXT, name TEXT, description TEXT, price TEXT, article TEXT)')
-    base.execute('CREATE TABLE IF NOT EXISTS accessories(counter INTEGER PRIMARY KEY AUTOINCREMENT, photo TEXT, name TEXT, description TEXT, price TEXT, article TEXT)')
-    base.execute('''CREATE TABLE IF NOT EXISTS users (
-                    id INTEGER PRIMARY KEY,
-                    user_id INTEGER UNIQUE)''')
+    base.execute('CREATE TABLE IF NOT EXISTS wait(counter INTEGER PRIMARY KEY AUTOINCREMENT, checkPay TEXT, name TEXT, age TEXT, studio TEXT, phone TEXT,eMail TEXT, id TEXT)')
+    base.execute('CREATE TABLE IF NOT EXISTS sweets(counter INTEGER PRIMARY KEY AUTOINCREMENT, checkPay TEXT, name TEXT, age TEXT, studio TEXT, phone TEXT,eMail TEXT, id TEXT)')
+    base.execute('CREATE TABLE IF NOT EXISTS scheduled_mailing (id INTEGER PRIMARY KEY AUTOINCREMENT, user_id TEXT, launch_time TEXT)')
     base.commit()
- 
-async def sql_start_bot_write(id):
-    base.execute("INSERT OR IGNORE INTO users (user_id) VALUES (?)", (id,))
-    base.commit()
+async def sql_check_scheduled_mailing(user_id):
+    cur.execute('SELECT user_id FROM scheduled_mailing WHERE user_id = ?', (user_id,))
+    existing_user = cur.fetchone()
+    return existing_user is not None
 
-async def sql_start_bot_read():
-    res = base.execute("SELECT COUNT(*) FROM users")
-    count = res.fetchone()[0]
-    return count
-
-
-async def sql_write(data):
-    category = data[0]
-    photo = data[1]
-    name = data[2]
-    descrip = data[3]
-    price = data[4]
-    article = data[5]
-
-    if category == "cosmetic":
-        cur.execute('INSERT INTO cosmetic (photo, name, description, price, article) VALUES (?, ?, ?, ?, ?)', (photo, name, descrip, price, article))
-    elif category == "sweets":
-        cur.execute('INSERT INTO sweets (photo, name, description, price, article) VALUES (?, ?, ?, ?, ?)', (photo, name, descrip, price, article))
-    elif category == "box":
-        cur.execute('INSERT INTO box (photo, name, description, price, article) VALUES (?, ?, ?, ?, ?)', (photo, name, descrip, price, article))
+async def sql_add_scheduled_mailing(user_id):
+    launch_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    if not await sql_check_scheduled_mailing(user_id):
+        cur.execute('INSERT INTO scheduled_mailing (user_id, launch_time) VALUES (?, ?)', (user_id, launch_time))
+        base.commit()
     else:
-        cur.execute('INSERT INTO accessories (photo, name, description, price, article) VALUES (?, ?, ?, ?, ?)', (photo, name, descrip, price, article))
-    base.commit()
+        pass
 
-async def sql_read_cosmetic():
-    cur.execute('SELECT * FROM cosmetic')
+async def sql_read_scheduled_mailing():
+    cur.execute('SELECT user_id, launch_time FROM scheduled_mailing')
     rows = cur.fetchall()
     return rows
 
-async def sql_read_sweets():
+async def sql_remove_scheduled_mailing(user_id):
+    cur.execute('DELETE FROM scheduled_mailing WHERE user_id = ?', (user_id,))
+    base.commit()
+
+async def sql_write(data, id):
+    checkPay = data[5]
+    name = data[0]
+    age = data[1]
+    studio = data[2]
+    phone = data[3]
+    eMail = data[4]
+    cur.execute('INSERT INTO wait (checkPay, name, age, studio, phone, eMail, id) VALUES (?, ?, ?, ?, ?, ?, ?)', (checkPay, name, age, studio, phone, eMail, id))
+    base.commit()
+
+async def sql_read():
+    cur.execute('SELECT * FROM wait')
+    rows = cur.fetchall()
+    return rows
+
+async def sql_read_2():
     cur.execute('SELECT * FROM sweets')
     rows = cur.fetchall()
     return rows
 
-async def sql_read_box():
-    cur.execute('SELECT * FROM box')
-    rows = cur.fetchall()
-    return rows
-
-async def sql_read_accessories():
-    cur.execute('SELECT * FROM accessories')
-    rows = cur.fetchall()
-    return rows
-
-
-async def sql_delete(category, id):
-    if category == "cosmetic":
-        cur.execute('DELETE FROM cosmetic WHERE counter = ?', (id,))
-    elif category == "sweets":
-        cur.execute('DELETE FROM sweets WHERE counter = ?', (id,))
-    elif category == "box":
-        cur.execute('DELETE FROM box WHERE counter = ?', (id,))
-    else:
-        cur.execute('DELETE FROM accessories WHERE counter = ?', (id,))
-    base.commit()
-
-
-
-
-async def sql_write_pay(id, us, arr):
-    data = arr[1]
-    price = arr[0]
-    cur.execute('REPLACE INTO pay VALUES (?, ?, ?, ?)', (id, us, data, price))
-    base.commit()
-
-async def sql_read_pay():
-    cur.execute('SELECT * FROM pay')
-    rows = cur.fetchall()
-    return rows
-
-async def sql_delete_pay(id):
-    cur.execute('DELETE FROM pay WHERE id = ?', (id,))
+async def sql_write_2(count):
+    cur.execute('SELECT * FROM wait WHERE counter = ?', (count,))
+    res = cur.fetchone()
+    cur.execute('DELETE FROM wait WHERE counter = ?', (count,))
+    cur.execute('INSERT INTO sweets (checkPay, name, age, studio, phone, eMail, id) VALUES (?, ?, ?, ?, ?, ?, ?)', (res[1], res[2], res[3], res[4], res[5], res[6], res[7]))
     base.commit()
